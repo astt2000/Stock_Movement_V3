@@ -22,11 +22,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           
-          # 1. Install base required utilities, capping pandas to guarantee stability
-          pip install httpx pandas==2.2.2
+          # 1. Install base required utilities
+          pip install httpx pandas
           
-          # 2. Pull the development branch cleanly as a static ZIP archive to completely bypass git credentials/auth errors
-          pip install https://github.com/twopirllc/pandas-ta/archive/refs/heads/development.zip
+          # 2. Install the clean, updated community drop-in replacement for pandas-ta
+          pip install pandas-ta-classic
 
       - name: Execute Python Backend Script
         run: |
