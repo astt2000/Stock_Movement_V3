@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QST Live Dual-Provider Grid</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+:root{
+  --bg:#080d14;--surface:#0d1520;--card:#0f1d2e;
+  --border:#1a2e44;--text:#c8ddf0;--accent:#00d4ff;--green:#00e5a0;--muted:#8ab4d4;
+  --font-mono:'JetBrains Mono',monospace;--font-ui:'Syne',sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:20px;}
+header{display:flex;justify-content:space-between;align-items:center;padding-bottom:15px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.title{font-family:var(--font-ui);font-size:16px;font-weight:800;color:var(--accent);}
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:10px;}
+.stock-row{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;}
+.s-symbol{font-family:var(--font-ui);font-size:14px;font-weight:700;color:var(--accent);}
+.s-price{font-size:18px;font-weight:600;margin-top:5px;color:var(--green);}
+.status-tag {margin-top: 8px; font-size: 11px; color: var(--muted); background: rgba(255,255,255,0.02); padding: 4px; border-radius: 4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">QST // Dual-Engine Multi-Streaming Live Matrix</div>
+  <div><span id="loadStatus" style="color:var(--accent)">LOADING PLATFORM FILES...</span></div>
+</header>
+
+<div class="stock-grid" id="stockGrid"></div>
+
+<script>
+const FINNHUB_KEY = 'd2530epr01qns40ctr90d2530epr01qns40ctr9g';
+let targetStocks = [];
+
+async function bootMatrix() {
+  try {
+    // Dynamically retrieve configured symbols from static tracking lists
+    const txt1 = await fetch('Stock_List.txt').then(r => r.text().catch(() => ''));
+    const txt2 = await fetch('Stock_List2.txt').then(r => r.text().catch(() => ''));
+    let arrays = (txt1 + '\n' + txt2).split('\n');
+    targetStocks = [...new Set(arrays.map(s => s.trim().toUpperCase()).filter(s => s && !s.startsWith('#')))];
+    
+    if(!targetStocks.length) targetStocks = ['ALAB','BTBT','OKLO'];
+
+    const grid = document.getElementById('stockGrid');
+    grid.innerHTML = '';
+    targetStocks.forEach(sym => {
+      grid.innerHTML += `
+        <div class="stock-row">
+          <div class="s-symbol">${sym}</div>
+          <div class="s-price" id="price-${sym}">Connecting Ticks...</div>
+          <div class="status-tag">Feed Provider: <span style="color:var(--accent)">Finnhub WebSockets</span></div>
+        </div>
+      `;
+    });
+
+    document.getElementById('loadStatus').textContent = `LIVE UPDATES • STREAMING ${targetStocks.length} INSTRUMENTS`;
+    
+    // Connect to Finnhub Live WebSocket Stream
+    const socket = new WebSocket(`wss://ws.finnhub.io?token=${FINNHUB_KEY}`);
+    socket.onopen = () => {
+      targetStocks.forEach(sym => {
+        socket.send(JSON.stringify({'type':'subscribe', 'symbol': sym}));
+      });
+    };
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'trade') {
+        const trade = data.data[0];
+        const el = document.getElementById(`price-${trade.s}`);
+        if(el) el.textContent = `$${trade.p.toFixed(2)}`;
+      }
+    };
+  } catch (err) {
+    console.error("Layout generation failure: ", err);
+  }
+}
+
+window.onload = bootMatrix;
+</script>
+</body>
+</html>
